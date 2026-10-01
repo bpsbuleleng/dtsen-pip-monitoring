@@ -151,11 +151,13 @@
 
       r._hariMenunggu = null;
       r._urgency = null;
-      if ((r.tindakLanjut === 'MENUNGGU RESPON' || r.tindakLanjut === 'SEDANG DIPERBAIKI') && r.tglVerifikasi) {
+      if (r.tindakLanjut && TINDAK_RANK[r.tindakLanjut] != null && r.tglVerifikasi) {
         var verifDate = parseSheetDateTime(r.tglVerifikasi);
         var days = Math.max(0, Math.floor((now - verifDate) / 86400000));
         r._hariMenunggu = days;
-        if (r.tindakLanjut === 'SEDANG DIPERBAIKI') {
+        if (r.tindakLanjut === 'SIAP DICEK ULANG') {
+          r._urgency = 'cek';
+        } else if (r.tindakLanjut === 'SEDANG DIPERBAIKI') {
           r._urgency = 'progress';
         } else if (days >= CONFIG.urgency.perhatian) {
           r._urgency = 'kritis';
@@ -252,6 +254,7 @@
     var perlu = records.filter(function (r) { return r.statusVerifikasi === 'PERLU DIPERBAIKI'; }).length;
     var menunggu = records.filter(function (r) { return r.tindakLanjut === 'MENUNGGU RESPON'; }).length;
     var sedang = records.filter(function (r) { return r.tindakLanjut === 'SEDANG DIPERBAIKI'; }).length;
+    var siapCek = records.filter(function (r) { return r.tindakLanjut === 'SIAP DICEK ULANG'; }).length;
     var takTerjangkau = records.filter(function (r) { return r.tindakLanjut && !r._terjangkauWA; }).length;
 
     document.getElementById('kpiTotal').textContent = total;
@@ -259,12 +262,13 @@
     document.getElementById('kpiPerlu').textContent = perlu;
     document.getElementById('kpiMenunggu').textContent = menunggu;
     document.getElementById('kpiSedang').textContent = sedang;
+    document.getElementById('kpiSiapCek').textContent = siapCek;
     document.getElementById('kpiTakTerjangkau').textContent = takTerjangkau;
   }
 
   // ---------- priority list ----------
-  var URGENCY_ORDER = { kritis: 0, perhatian: 1, baru: 2, progress: 3 };
-  var URGENCY_LABEL = { kritis: 'Kritis', perhatian: 'Perhatian', baru: 'Baru', progress: 'Sedang Diperbaiki' };
+  var URGENCY_ORDER = { cek: 0, kritis: 1, perhatian: 2, baru: 3, progress: 4 };
+  var URGENCY_LABEL = { cek: 'Siap Dicek Ulang', kritis: 'Kritis', perhatian: 'Perhatian', baru: 'Baru', progress: 'Sedang Diperbaiki' };
 
   function getPriorityRecords() {
     return state.records
@@ -500,9 +504,9 @@
     var sama = records.filter(function (r) { return r.hasilPemutakhiran === 'Sama'; }).length;
     var turun = records.filter(function (r) { return r.hasilPemutakhiran === 'Turun'; }).length;
     renderBarBreakdown('desilBreakdown', [
-      { label: 'Sama', value: sama, color: 'var(--cat-c)' },
-      { label: 'Naik', value: naik, color: 'var(--cat-a)' },
-      { label: 'Turun', value: turun, color: 'var(--cat-b)' }
+      { label: 'Sama', value: sama, color: 'var(--neutral-soft)' },
+      { label: 'Naik', value: naik, color: 'var(--ink)' },
+      { label: 'Turun', value: turun, color: 'var(--ink)' }
     ], records.length);
 
     // Alasan perbaikan teratas
@@ -513,7 +517,7 @@
       var cat = categorizeReason(r.catatanPerbaikan);
       reasonCounts[cat] = (reasonCounts[cat] || 0) + 1;
     });
-    var reasonItems = Object.keys(reasonCounts).map(function (k) { return { label: k, value: reasonCounts[k], color: 'var(--warn)' }; })
+    var reasonItems = Object.keys(reasonCounts).map(function (k) { return { label: k, value: reasonCounts[k], color: 'var(--neutral)' }; })
       .sort(function (a, b) { return b.value - a.value; });
     renderBarBreakdown('reasonBreakdown', reasonItems, withNote.length);
     var noteFooter = (perluRecords.length - withNote.length) + ' dari ' + perluRecords.length + ' kasus "Perlu Diperbaiki" belum punya catatan rinci.';
@@ -525,9 +529,9 @@
     var noWaReg = followUp.filter(function (r) { return r.nomorHp && r.tidakTerdaftarWA; }).length;
     var noPhone = followUp.filter(function (r) { return !r.nomorHp; }).length;
     renderBarBreakdown('waBreakdown', [
-      { label: 'Terjangkau WA', value: reach, color: 'var(--ok)' },
-      { label: 'Tidak terdaftar WA', value: noWaReg, color: 'var(--warn)' },
-      { label: 'Tidak ada nomor HP', value: noPhone, color: 'var(--muted-status)' }
+      { label: 'Terjangkau WA', value: reach, color: 'var(--ink)' },
+      { label: 'Tidak terdaftar WA', value: noWaReg, color: 'var(--accent)' },
+      { label: 'Tidak ada nomor HP', value: noPhone, color: 'var(--accent)' }
     ], followUp.length);
   }
 
@@ -541,7 +545,7 @@
 
   // ---------- sorting ----------
   var STATUS_RANK = { 'PERLU DIPERBAIKI': 0, 'SESUAI': 1 };
-  var TINDAK_RANK = { 'MENUNGGU RESPON': 0, 'SEDANG DIPERBAIKI': 1, '': 2 };
+  var TINDAK_RANK = { 'SIAP DICEK ULANG': 0, 'MENUNGGU RESPON': 1, 'SEDANG DIPERBAIKI': 2, '': 3 };
 
   var SORT_ACCESSORS = {
     noKK: function (r) { return r.noKK || null; },
@@ -599,14 +603,15 @@
   }
 
   function statusToneAndLabel(r) {
-    if (r.statusVerifikasi === 'SESUAI') return { tone: 'ok', label: 'Sesuai' };
-    if (r.statusVerifikasi === 'PERLU DIPERBAIKI') return { tone: 'warn', label: 'Perlu Diperbaiki' };
+    if (r.statusVerifikasi === 'SESUAI') return { tone: 'muted', label: 'Sesuai' };
+    if (r.statusVerifikasi === 'PERLU DIPERBAIKI') return { tone: 'alert', label: 'Perlu Diperbaiki' };
     return { tone: 'muted', label: '–' };
   }
   function tindakToneAndLabel(r) {
-    if (r.tindakLanjut === 'MENUNGGU RESPON') return { tone: 'warn', label: 'Menunggu Respon' };
-    if (r.tindakLanjut === 'SEDANG DIPERBAIKI') return { tone: 'progress', label: 'Sedang Diperbaiki' };
-    return { tone: 'ok', label: 'Selesai' };
+    if (r.tindakLanjut === 'SIAP DICEK ULANG') return { tone: 'ink', label: 'Siap Dicek Ulang' };
+    if (r.tindakLanjut === 'MENUNGGU RESPON') return { tone: 'alert', label: 'Menunggu Respon' };
+    if (r.tindakLanjut === 'SEDANG DIPERBAIKI') return { tone: 'muted', label: 'Sedang Diperbaiki' };
+    return { tone: 'plain', label: 'Selesai' };
   }
 
   function getPageWindow(page, total) {

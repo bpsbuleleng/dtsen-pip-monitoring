@@ -32,29 +32,33 @@
 <main>
 
   <section class="kpi-grid" id="kpiGrid" aria-label="Ringkasan kondisi verifikasi">
-    <div class="kpi-card" data-tone="neutral">
+    <div class="kpi-card kpi-card--total">
       <span class="kpi-value" id="kpiTotal">–</span>
       <span class="kpi-label">Total Pengajuan</span>
     </div>
-    <div class="kpi-card" data-tone="ok">
+    <div class="kpi-card">
       <span class="kpi-value" id="kpiSesuai">–</span>
       <span class="kpi-label">Sesuai</span>
     </div>
-    <div class="kpi-card" data-tone="warn">
+    <div class="kpi-card">
       <span class="kpi-value" id="kpiPerlu">–</span>
       <span class="kpi-label">Perlu Diperbaiki</span>
     </div>
-    <div class="kpi-card" data-tone="crit">
+    <div class="kpi-card">
+      <span class="kpi-value" id="kpiTakTerjangkau">–</span>
+      <span class="kpi-label">Tidak Terjangkau WA</span>
+    </div>
+    <div class="kpi-card" data-tone="alert">
       <span class="kpi-value" id="kpiMenunggu">–</span>
       <span class="kpi-label">Menunggu Respon</span>
     </div>
-    <div class="kpi-card" data-tone="progress">
+    <div class="kpi-card">
       <span class="kpi-value" id="kpiSedang">–</span>
       <span class="kpi-label">Sedang Diperbaiki</span>
     </div>
-    <div class="kpi-card" data-tone="muted">
-      <span class="kpi-value" id="kpiTakTerjangkau">–</span>
-      <span class="kpi-label">Tidak Terjangkau WA</span>
+    <div class="kpi-card" data-tone="ink">
+      <span class="kpi-value" id="kpiSiapCek">–</span>
+      <span class="kpi-label">Siap Dicek Ulang</span>
     </div>
   </section>
 
@@ -124,6 +128,7 @@
         <option value="all">Semua Tindak Lanjut</option>
         <option value="MENUNGGU RESPON">Menunggu Respon</option>
         <option value="SEDANG DIPERBAIKI">Sedang Diperbaiki</option>
+        <option value="SIAP DICEK ULANG">Siap Dicek Ulang</option>
         <option value="SELESAI">Selesai / Tidak Ada</option>
       </select>
       <select id="sortSelect" class="input-select sort-select" aria-label="Urutkan berdasarkan">
@@ -137,7 +142,7 @@
         <option value="noKK:desc">No KK (Z-A)</option>
         <option value="statusVerifikasi:asc">Status (Perlu Diperbaiki dulu)</option>
         <option value="statusVerifikasi:desc">Status (Sesuai dulu)</option>
-        <option value="tindakLanjut:asc">Tindak Lanjut (Menunggu dulu)</option>
+        <option value="tindakLanjut:asc">Tindak Lanjut (Siap Dicek Ulang dulu)</option>
         <option value="prioritas:desc">Prioritas (Paling lama menunggu)</option>
         <option value="prioritas:asc">Prioritas (Paling baru)</option>
       </select>
@@ -161,16 +166,18 @@
     <summary class="priority-summary">
       <div>
         <h2>Prioritas Tindak Lanjut</h2>
-        <p class="panel-sub">Kasus "Perlu Diperbaiki" diurutkan dari yang paling lama menunggu respon keluarga. Klik untuk buka/tutup.</p>
+        <p class="panel-sub">Kasus "Siap Dicek Ulang" tampil paling atas, disusul "Menunggu Respon" dari yang paling lama menunggu, lalu "Sedang Diperbaiki". Klik untuk buka/tutup.</p>
       </div>
       <svg class="accordion-chevron" width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M4.5 7l4.5 4.5L13.5 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </summary>
     <div class="priority-body">
       <div class="chip-filter" id="urgencyFilter" role="group" aria-label="Filter urgensi">
         <button type="button" class="chip is-active" data-urgency="all">Semua</button>
+        <button type="button" class="chip" data-urgency="cek">Siap Dicek Ulang</button>
         <button type="button" class="chip" data-urgency="kritis">Kritis</button>
         <button type="button" class="chip" data-urgency="perhatian">Perhatian</button>
         <button type="button" class="chip" data-urgency="baru">Baru</button>
+        <button type="button" class="chip" data-urgency="progress">Sedang Diperbaiki</button>
       </div>
       <div id="priorityList" class="priority-list"></div>
       <button type="button" id="priorityMoreBtn" class="btn-more" hidden>Tampilkan lebih banyak</button>

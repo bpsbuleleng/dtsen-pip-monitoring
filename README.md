@@ -56,7 +56,7 @@ Buat/pakai spreadsheet dengan satu tab data (bebas namanya, contoh di sini: **Da
 | P | Link kirim | tidak dipakai dashboard |
 | Q | Catatan Perbaikan | teks bebas, dipakai untuk panel "Alasan Perbaikan Teratas" |
 | R | Hasil Pemutakhiran | harus `Naik` / `Sama` / `Turun` |
-| S | Tindak Lanjut | harus `MENUNGGU RESPON` / `SEDANG DIPERBAIKI` / kosong |
+| S | Tindak Lanjut | harus `SIAP DICEK ULANG` / `MENUNGGU RESPON` / `SEDANG DIPERBAIKI` / kosong |
 
 Kalau struktur sheet daerah lain beda, cara paling gampang: samakan saja urutan kolom ke format di atas (tambah kolom bantu/formula kalau perlu), supaya tidak perlu ubah kode. Kalau memang mau ubah pemetaan kolom, edit fungsi `rowsToRecords()` di `assets/app.js` (baris ±66).
 
@@ -115,7 +115,7 @@ Tanpa file ini, dashboard tetap berfungsi normal — hanya langsung fetch live s
 
 ### 7. Kustomisasi lain yang umum diubah
 
-- **Warna/branding** — token warna ada di `:root` pada `assets/style.css` (`--brand`, `--ok`, `--warn`, `--crit`, dst).
+- **Warna/branding** — token warna ada di `:root` pada `assets/style.css` — memakai palet logo Sensus Ekonomi 2026: oranye `--accent` (#F89039), kuning `--accent-2` (#FFBC28), arang `--ink` (#201820); sisanya netral hangat (`--neutral*`).
 - **Ambang urgensi "hari menunggu"** — `CONFIG.urgency` di `assets/app.js`.
 - **Aturan masking No KK/nomor HP** — fungsi `maskNoKK()` dan `maskPhone()` di `assets/app.js`.
 - **Kategori "Alasan Perbaikan Teratas"** — fungsi `categorizeReason()` di `assets/app.js`, sesuaikan kata kunci dengan jenis catatan verifikator setempat.
