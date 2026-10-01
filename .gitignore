@@ -1,0 +1,7 @@
+# Data pribadi keluarga (nama, No KK, nomor HP) - jangan diupload ke GitHub
+data/snapshot.json
+data/*.csv
+
+# OS / editor
+.DS_Store
+Thumbs.db

@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Verifikasi Pembaruan DTSEN — PIP &amp; KIP-K</title>
+<meta name="description" content="Dashboard kondisi verifikasi keluarga pengaju pembaruan DTSEN untuk PIP dan KIP-K, Kabupaten Buleleng.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-title">
+    <h1>Verifikasi Pembaruan DTSEN</h1>
+    <p class="topbar-sub">PIP &amp; KIP-K — Badan Pusat Statistik Kabupaten Buleleng</p>
+  </div>
+  <div class="topbar-sync">
+    <span class="sync-dot" id="syncDot" data-state="loading" aria-hidden="true"></span>
+    <span id="syncLabel">Memuat data…</span>
+    <button id="refreshBtn" class="btn-refresh" type="button" aria-label="Perbarui data">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M13.65 2.35A6.5 6.5 0 1 0 14.5 8h-1.5a5 5 0 1 1-1.47-3.54L9 7h5V2l-1.85 1.85Z" fill="currentColor"/></svg>
+      <span>Refresh</span>
+    </button>
+  </div>
+</header>
+
+<div class="banner" id="dataBanner" hidden role="status"></div>
+
+<main>
+
+  <section class="kpi-grid" id="kpiGrid" aria-label="Ringkasan kondisi verifikasi">
+    <div class="kpi-card" data-tone="neutral">
+      <span class="kpi-value" id="kpiTotal">–</span>
+      <span class="kpi-label">Total Pengajuan</span>
+    </div>
+    <div class="kpi-card" data-tone="ok">
+      <span class="kpi-value" id="kpiSesuai">–</span>
+      <span class="kpi-label">Sesuai</span>
+    </div>
+    <div class="kpi-card" data-tone="warn">
+      <span class="kpi-value" id="kpiPerlu">–</span>
+      <span class="kpi-label">Perlu Diperbaiki</span>
+    </div>
+    <div class="kpi-card" data-tone="crit">
+      <span class="kpi-value" id="kpiMenunggu">–</span>
+      <span class="kpi-label">Menunggu Respon</span>
+    </div>
+    <div class="kpi-card" data-tone="progress">
+      <span class="kpi-value" id="kpiSedang">–</span>
+      <span class="kpi-label">Sedang Diperbaiki</span>
+    </div>
+    <div class="kpi-card" data-tone="muted">
+      <span class="kpi-value" id="kpiTakTerjangkau">–</span>
+      <span class="kpi-label">Tidak Terjangkau WA</span>
+    </div>
+  </section>
+
+  <section class="panel trend-panel" aria-labelledby="trendHeading">
+    <div class="panel-head">
+      <div>
+        <h2 id="trendHeading">Tren Verifikasi Harian</h2>
+        <p class="panel-sub">Klik legenda untuk tampil/sembunyikan seri, arahkan kursor ke batang untuk detail.</p>
+      </div>
+      <div class="legend" id="trendLegend" role="group" aria-label="Tampilkan/sembunyikan seri grafik">
+        <button type="button" class="legend-item" data-series="ok" aria-pressed="true"><i class="legend-dot" data-tone="ok"></i>Sesuai</button>
+        <button type="button" class="legend-item" data-series="warn" aria-pressed="true"><i class="legend-dot" data-tone="warn"></i>Perlu Diperbaiki</button>
+      </div>
+    </div>
+    <div class="trend-filter">
+      <label class="trend-filter-field">Dari<input type="date" id="trendFrom" class="input-date"></label>
+      <label class="trend-filter-field">Sampai<input type="date" id="trendTo" class="input-date"></label>
+      <button type="button" id="trendResetBtn" class="btn-ghost">Reset rentang</button>
+    </div>
+    <div class="trend-scroll">
+      <svg id="trendChart" class="trend-svg" role="img" aria-label="Grafik tren verifikasi harian"></svg>
+    </div>
+  </section>
+
+  <section class="panel histogram-panel" aria-labelledby="histHeading">
+    <div class="panel-head">
+      <div>
+        <h2 id="histHeading">Distribusi Lama Menunggu Respon</h2>
+        <p class="panel-sub">Sebaran kasus "Menunggu Respon" berdasarkan jumlah hari sejak diverifikasi — makin ke kanan makin mendesak.</p>
+      </div>
+    </div>
+    <div class="trend-scroll">
+      <svg id="histChart" class="trend-svg" role="img" aria-label="Grafik distribusi lama menunggu respon"></svg>
+    </div>
+  </section>
+
+  <section class="secondary-grid">
+    <div class="panel small-panel" aria-labelledby="desilHeading">
+      <h3 id="desilHeading">Perubahan Desil</h3>
+      <div id="desilBreakdown" class="bar-breakdown"></div>
+    </div>
+    <div class="panel small-panel" aria-labelledby="reasonHeading">
+      <h3 id="reasonHeading">Alasan Perbaikan Teratas</h3>
+      <div id="reasonBreakdown" class="bar-breakdown"></div>
+    </div>
+    <div class="panel small-panel" aria-labelledby="waHeading">
+      <h3 id="waHeading">Keterjangkauan WhatsApp</h3>
+      <div id="waBreakdown" class="bar-breakdown"></div>
+    </div>
+  </section>
+
+  <section class="panel table-panel" aria-labelledby="tableHeading">
+    <div class="panel-head">
+      <div>
+        <h2 id="tableHeading">Riwayat Lengkap</h2>
+        <p class="panel-sub" id="tableCount">Memuat…</p>
+      </div>
+    </div>
+    <div class="table-controls">
+      <input type="search" id="searchInput" class="input-text" placeholder="Cari nama atau No KK…" aria-label="Cari nama atau No KK">
+      <select id="statusFilter" class="input-select" aria-label="Filter status verifikasi">
+        <option value="all">Semua Status</option>
+        <option value="SESUAI">Sesuai</option>
+        <option value="PERLU DIPERBAIKI">Perlu Diperbaiki</option>
+      </select>
+      <select id="tindakFilter" class="input-select" aria-label="Filter tindak lanjut">
+        <option value="all">Semua Tindak Lanjut</option>
+        <option value="MENUNGGU RESPON">Menunggu Respon</option>
+        <option value="SEDANG DIPERBAIKI">Sedang Diperbaiki</option>
+        <option value="SELESAI">Selesai / Tidak Ada</option>
+      </select>
+      <select id="sortSelect" class="input-select sort-select" aria-label="Urutkan berdasarkan">
+        <option value="tglVerifikasi:desc">Tgl Verifikasi (Terbaru)</option>
+        <option value="tglVerifikasi:asc">Tgl Verifikasi (Terlama)</option>
+        <option value="tglSubmit:desc">Tgl Submit (Terbaru)</option>
+        <option value="tglSubmit:asc">Tgl Submit (Terlama)</option>
+        <option value="nama:asc">Nama (A-Z)</option>
+        <option value="nama:desc">Nama (Z-A)</option>
+        <option value="noKK:asc">No KK (A-Z)</option>
+        <option value="noKK:desc">No KK (Z-A)</option>
+        <option value="statusVerifikasi:asc">Status (Perlu Diperbaiki dulu)</option>
+        <option value="statusVerifikasi:desc">Status (Sesuai dulu)</option>
+        <option value="tindakLanjut:asc">Tindak Lanjut (Menunggu dulu)</option>
+        <option value="prioritas:desc">Prioritas (Paling lama menunggu)</option>
+        <option value="prioritas:asc">Prioritas (Paling baru)</option>
+      </select>
+    </div>
+    <div class="record-table" id="recordTable">
+      <div class="record-row record-row--head" id="recordHead">
+        <button type="button" class="cell cell-sort" data-sort-key="noKK">No KK<span class="sort-indicator"></span></button>
+        <button type="button" class="cell cell-sort" data-sort-key="nama">Nama Kepala Keluarga<span class="sort-indicator"></span></button>
+        <button type="button" class="cell cell-sort" data-sort-key="tglSubmit">Tgl Submit<span class="sort-indicator"></span></button>
+        <button type="button" class="cell cell-sort" data-sort-key="statusVerifikasi">Status<span class="sort-indicator"></span></button>
+        <button type="button" class="cell cell-sort" data-sort-key="tglVerifikasi">Tgl Verifikasi<span class="sort-indicator"></span></button>
+        <button type="button" class="cell cell-sort" data-sort-key="tindakLanjut">Tindak Lanjut<span class="sort-indicator"></span></button>
+        <button type="button" class="cell cell-sort" data-sort-key="prioritas">Prioritas<span class="sort-indicator"></span></button>
+      </div>
+      <div id="recordRows"></div>
+    </div>
+    <nav class="pagination" id="tablePagination" aria-label="Navigasi halaman tabel"></nav>
+  </section>
+
+  <details class="panel priority-panel" id="priorityDetails">
+    <summary class="priority-summary">
+      <div>
+        <h2>Prioritas Tindak Lanjut</h2>
+        <p class="panel-sub">Kasus "Perlu Diperbaiki" diurutkan dari yang paling lama menunggu respon keluarga. Klik untuk buka/tutup.</p>
+      </div>
+      <svg class="accordion-chevron" width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M4.5 7l4.5 4.5L13.5 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </summary>
+    <div class="priority-body">
+      <div class="chip-filter" id="urgencyFilter" role="group" aria-label="Filter urgensi">
+        <button type="button" class="chip is-active" data-urgency="all">Semua</button>
+        <button type="button" class="chip" data-urgency="kritis">Kritis</button>
+        <button type="button" class="chip" data-urgency="perhatian">Perhatian</button>
+        <button type="button" class="chip" data-urgency="baru">Baru</button>
+      </div>
+      <div id="priorityList" class="priority-list"></div>
+      <button type="button" id="priorityMoreBtn" class="btn-more" hidden>Tampilkan lebih banyak</button>
+    </div>
+  </details>
+
+</main>
+
+<footer class="page-footer">
+  <p>Sumber data: Google Sheets "LK Verifikasi Perubahan DTSEN", tab Database. Data disinkronkan langsung dari spreadsheet; No KK dan Nomor HP ditampilkan tersamar.</p>
+</footer>
+
+<div id="chartTooltip" class="chart-tooltip" role="tooltip" hidden></div>
+
+<script src="assets/app.js" defer></script>
+</body>
+</html>
