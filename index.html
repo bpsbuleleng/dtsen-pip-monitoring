@@ -66,11 +66,12 @@
     <div class="panel-head">
       <div>
         <h2 id="trendHeading">Tren Verifikasi Harian</h2>
-        <p class="panel-sub">Klik legenda untuk tampil/sembunyikan seri, arahkan kursor ke batang untuk detail.</p>
+        <p class="panel-sub">Batang: jumlah per hari. Garis: jumlah kumulatif sejak awal verifikasi. Klik legenda untuk tampil/sembunyikan seri, arahkan kursor untuk detail.</p>
       </div>
       <div class="legend" id="trendLegend" role="group" aria-label="Tampilkan/sembunyikan seri grafik">
         <button type="button" class="legend-item" data-series="ok" aria-pressed="true"><i class="legend-dot" data-tone="ok"></i>Sesuai</button>
         <button type="button" class="legend-item" data-series="warn" aria-pressed="true"><i class="legend-dot" data-tone="warn"></i>Perlu Diperbaiki</button>
+        <button type="button" class="legend-item" data-series="total" aria-pressed="true"><i class="legend-dot legend-dot--line" data-tone="total"></i>Total (kumulatif)</button>
       </div>
     </div>
     <div class="trend-filter">
@@ -79,7 +80,10 @@
       <button type="button" id="trendResetBtn" class="btn-ghost">Reset rentang</button>
     </div>
     <div class="trend-scroll">
+      <p class="chart-caption">Harian</p>
       <svg id="trendChart" class="trend-svg" role="img" aria-label="Grafik tren verifikasi harian"></svg>
+      <p class="chart-caption">Kumulatif</p>
+      <svg id="cumChart" class="trend-svg" role="img" aria-label="Grafik garis kumulatif verifikasi"></svg>
     </div>
   </section>
 

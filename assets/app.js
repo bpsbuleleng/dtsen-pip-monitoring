@@ -26,10 +26,11 @@
     priorityShown: 12,
     trendFrom: null,
     trendTo: null,
-    trendVisible: { ok: true, warn: true }
+    trendVisible: { ok: true, warn: true, total: true }
   };
 
   var lastTrendDays = [];
+  var lastCumDays = [];
   var lastHistBuckets = [];
   var tooltipEl = null;
 
@@ -343,7 +344,11 @@
   function renderTrend() {
     var svg = document.getElementById('trendChart');
     var bounds = getVerifDateBounds();
-    if (!bounds.min) { svg.innerHTML = ''; lastTrendDays = []; return; }
+    if (!bounds.min) {
+      svg.innerHTML = ''; lastTrendDays = [];
+      document.getElementById('cumChart').innerHTML = ''; lastCumDays = [];
+      return;
+    }
 
     if (!state.trendFrom) state.trendFrom = bounds.min;
     if (!state.trendTo) state.trendTo = bounds.max;
@@ -400,7 +405,7 @@
         (dayData.ok > 0 ? '<rect class="trend-bar-ok" x="' + x + '" y="' + yOk + '" width="' + barW + '" height="' + Math.max(okH, 1) + '" rx="1.5"></rect>' : '') +
         (dayData.warn > 0 ? '<rect class="trend-bar-warn" x="' + x + '" y="' + yWarn + '" width="' + barW + '" height="' + Math.max(warnH, 1) + '" rx="1.5"></rect>' : '') +
         '</g>');
-      if (i % 4 === 0 || i === days.length - 1) {
+      if ((i % 4 === 0 && i < days.length - 3) || i === days.length - 1) {
         var p = dayData.key.split('-');
         svgParts.push('<text class="trend-axis-label" x="' + (x + barW / 2) + '" y="' + (padTop + chartH + 15) + '" text-anchor="middle">' + p[2] + '/' + p[1] + '</text>');
       }
@@ -411,6 +416,94 @@
     svg.setAttribute('height', height);
     svg.innerHTML = svgParts.join('');
     lastTrendDays = days;
+    renderCumulative(days, { barW: barW, gap: gap, padLeft: padLeft });
+  }
+
+  // ---------- cumulative line chart (shares x-axis with the daily bars) ----------
+  var CUM_SERIES = ['total', 'warn', 'ok']; // draw order: total at the back
+
+  function niceCeil(v) {
+    if (v <= 0) return 1;
+    var p = Math.pow(10, Math.floor(Math.log10(v)));
+    var n = v / p;
+    var steps = [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10];
+    for (var i = 0; i < steps.length; i++) if (n <= steps[i]) return steps[i] * p;
+    return 10 * p;
+  }
+
+  function renderCumulative(days, layout) {
+    var svg = document.getElementById('cumChart');
+    if (!days.length) { svg.innerHTML = ''; lastCumDays = []; return; }
+
+    // start from everything verified before the selected range, so the line is truly cumulative
+    var base = { ok: 0, warn: 0 };
+    state.records.forEach(function (r) {
+      if (!r._verifKey || r._verifKey >= state.trendFrom) return;
+      if (r.statusVerifikasi === 'SESUAI') base.ok++;
+      else if (r.statusVerifikasi === 'PERLU DIPERBAIKI') base.warn++;
+    });
+
+    var ok = base.ok, warn = base.warn;
+    var cum = days.map(function (d) {
+      ok += d.okReal; warn += d.warnReal;
+      return { key: d.key, ok: ok, warn: warn, total: ok + warn, okDay: d.okReal, warnDay: d.warnReal };
+    });
+
+    var visible = CUM_SERIES.filter(function (k) { return state.trendVisible[k]; });
+    var last = cum[cum.length - 1];
+    var yMax = niceCeil(Math.max.apply(null, visible.map(function (k) { return last[k]; }).concat([1])));
+
+    var barW = layout.barW, gap = layout.gap, padLeft = layout.padLeft;
+    var chartH = 150, padTop = 14, padBottom = 24, padRight = 40;
+    var width = padLeft + days.length * (barW + gap) + padRight;
+    var height = padTop + chartH + padBottom;
+    var yBase = padTop + chartH;
+    function xAt(i) { return padLeft + i * (barW + gap) + barW / 2; }
+    function yAt(v) { return yBase - (v / yMax) * chartH; }
+
+    var parts = [];
+    [0, yMax / 2, yMax].forEach(function (t) {
+      var y = yAt(t);
+      parts.push('<line class="' + (t === 0 ? 'trend-axis-line' : 'cum-grid') + '" x1="' + padLeft + '" y1="' + y + '" x2="' + (width - padRight) + '" y2="' + y + '"></line>');
+      if (t > 0) parts.push('<text class="trend-axis-label" x="' + (padLeft + 2) + '" y="' + (y - 3) + '">' + Math.round(t) + '</text>');
+    });
+
+    cum.forEach(function (c, i) {
+      var x = xAt(i);
+      parts.push('<g class="chart-bar-group" data-idx="' + i + '">' +
+        '<rect class="chart-hit" x="' + (x - (barW + gap) / 2) + '" y="' + padTop + '" width="' + (barW + gap) + '" height="' + chartH + '" fill="transparent"></rect>' +
+        '<line class="cum-guide" x1="' + x + '" y1="' + padTop + '" x2="' + x + '" y2="' + yBase + '"></line>' +
+        '</g>');
+      if ((i % 4 === 0 && i < cum.length - 3) || i === cum.length - 1) {
+        var p = c.key.split('-');
+        parts.push('<text class="trend-axis-label" x="' + x + '" y="' + (yBase + 15) + '" text-anchor="middle">' + p[2] + '/' + p[1] + '</text>');
+      }
+    });
+
+    visible.forEach(function (k) {
+      var pts = cum.map(function (c, i) { return xAt(i).toFixed(1) + ',' + yAt(c[k]).toFixed(1); }).join(' ');
+      var lx = xAt(cum.length - 1), ly = yAt(last[k]);
+      parts.push('<polyline class="cum-line" data-series="' + k + '" points="' + pts + '" pointer-events="none"></polyline>');
+      parts.push('<circle class="cum-dot" data-series="' + k + '" cx="' + lx + '" cy="' + ly + '" r="3" pointer-events="none"></circle>');
+      parts.push('<text class="cum-end-label" data-series="' + k + '" x="' + (lx + 6) + '" y="' + (ly + 3.5) + '">' + last[k] + '</text>');
+    });
+
+    svg.setAttribute('viewBox', '0 0 ' + width + ' ' + height);
+    svg.setAttribute('width', width);
+    svg.setAttribute('height', height);
+    svg.innerHTML = parts.join('');
+    lastCumDays = cum;
+
+    // show the latest dates first; older days are reachable by scrolling left
+    var scroller = svg.closest('.trend-scroll');
+    scroller.scrollLeft = scroller.scrollWidth;
+  }
+
+  function formatCumTooltip(c) {
+    return '<div class="tt-title">' + formatDateID(c.key) + '</div>' +
+      'Total kumulatif: ' + c.total + '<br>' +
+      'Sesuai: ' + c.ok + ' (+' + c.okDay + ')<br>' +
+      'Perlu Diperbaiki: ' + c.warn + ' (+' + c.warnDay + ')';
   }
 
   function formatTrendTooltip(d) {
@@ -806,6 +899,7 @@
     });
 
     attachChartHover(document.getElementById('trendChart'), function () { return lastTrendDays; }, formatTrendTooltip);
+    attachChartHover(document.getElementById('cumChart'), function () { return lastCumDays; }, formatCumTooltip);
     attachChartHover(document.getElementById('histChart'), function () { return lastHistBuckets; }, formatHistTooltip);
   }
 
