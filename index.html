@@ -31,6 +31,18 @@
 
 <main>
 
+  <section class="desil-filter" aria-labelledby="desilFilterLabel">
+    <div class="desil-filter-head">
+      <span class="desil-filter-label" id="desilFilterLabel">Filter desil</span>
+      <select id="desilBasis" class="input-select input-select--sm" aria-label="Dasar filter desil">
+        <option value="saatIni">Desil saat ini</option>
+        <option value="sebelumnya">Desil sebelumnya</option>
+      </select>
+      <span class="desil-filter-count" id="desilFilterCount"></span>
+    </div>
+    <div class="chip-filter" id="desilChips" role="group" aria-label="Pilih desil (bisa lebih dari satu)"></div>
+  </section>
+
   <section class="kpi-grid" id="kpiGrid" aria-label="Ringkasan kondisi verifikasi">
     <div class="kpi-card kpi-card--total">
       <span class="kpi-value" id="kpiTotal">–</span>
@@ -97,6 +109,24 @@
     <div class="trend-scroll">
       <svg id="histChart" class="trend-svg" role="img" aria-label="Grafik distribusi lama menunggu respon"></svg>
     </div>
+  </section>
+
+  <section class="panel sankey-panel" aria-labelledby="sankeyHeading">
+    <div class="panel-head">
+      <div>
+        <h2 id="sankeyHeading">Perpindahan Desil</h2>
+        <p class="panel-sub">Aliran keluarga dari desil sebelumnya (kiri) ke desil hasil pemutakhiran (kanan). Tebal pita = jumlah keluarga. Klik legenda untuk tampil/sembunyikan arah perubahan, arahkan kursor ke pita atau simpul untuk detail.</p>
+      </div>
+      <div class="legend" id="sankeyLegend" role="group" aria-label="Tampilkan/sembunyikan arah perubahan desil">
+        <button type="button" class="legend-item" data-dir="turun" aria-pressed="true"><i class="legend-dot legend-dot--line" data-tone="turun"></i>Turun</button>
+        <button type="button" class="legend-item" data-dir="naik" aria-pressed="true"><i class="legend-dot legend-dot--line" data-tone="naik"></i>Naik</button>
+        <button type="button" class="legend-item" data-dir="sama" aria-pressed="true"><i class="legend-dot legend-dot--line" data-tone="sama"></i>Tetap</button>
+      </div>
+    </div>
+    <div class="sankey-wrap" id="sankeyWrap">
+      <svg id="sankeyChart" class="sankey-svg" role="img" aria-label="Diagram aliran perpindahan desil"></svg>
+    </div>
+    <p class="bar-footnote" id="sankeyNote"></p>
   </section>
 
   <section class="secondary-grid">

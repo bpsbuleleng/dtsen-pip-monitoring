@@ -260,6 +260,30 @@ main {
   border-color: var(--text);
 }
 
+/* ---------- Global desil filter ---------- */
+.desil-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+.desil-filter[data-active="true"] { border-color: var(--accent); }
+.desil-filter-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+}
+.desil-filter-label { font-size: 13px; font-weight: 600; }
+.input-select--sm { padding: 5px 8px; font-size: 13px; }
+.desil-filter-count { font-size: 12.5px; color: var(--text-muted); }
+.desil-filter-count .btn-ghost { padding: 0 0 0 6px; }
+.chip .num { font-size: 11px; opacity: .65; margin-left: 3px; }
+
 /* ---------- Priority accordion ---------- */
 .priority-panel { padding: 0; }
 .priority-summary {
@@ -502,6 +526,49 @@ details[open] .accordion-chevron { transform: rotate(180deg); }
 .hist-bar[data-tone="baru"] { fill: var(--neutral-soft); }
 .hist-bar[data-tone="perhatian"] { fill: var(--accent-2); }
 .hist-bar[data-tone="kritis"] { fill: var(--accent); }
+
+/* ---------- Sankey perpindahan desil ---------- */
+.sankey-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-bottom: 8px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+.sankey-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend-dot[data-tone="turun"] { background: var(--ink); }
+.legend-dot[data-tone="naik"] { background: var(--accent); }
+.legend-dot[data-tone="sama"] { background: var(--neutral-soft); }
+
+.sankey-wrap { width: 100%; }
+.sankey-svg { display: block; width: 100%; }
+.sankey-col-title {
+  font-size: 11px;
+  font-weight: 600;
+  fill: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.sankey-link {
+  fill: none;
+  stroke-opacity: .42;
+  cursor: pointer;
+  transition: stroke-opacity .12s ease;
+}
+.sankey-link[data-dir="turun"] { stroke: var(--ink); stroke-opacity: .55; }
+.sankey-link[data-dir="naik"] { stroke: var(--accent); stroke-opacity: .7; }
+.sankey-link[data-dir="sama"] { stroke: var(--neutral-soft); stroke-opacity: .55; }
+.sankey-svg.is-focus .sankey-link { stroke-opacity: .08; }
+.sankey-svg.is-focus .sankey-link.is-hot { stroke-opacity: .85; }
+.sankey-node { fill: var(--ink); cursor: pointer; }
+.sankey-node[data-empty="true"] { fill: var(--neutral); }
+.sankey-label {
+  font-size: 11.5px;
+  fill: var(--text);
+  font-weight: 500;
+}
+.sankey-label .num { font-family: var(--font-num); fill: var(--text-muted); font-weight: 400; }
 
 /* ---------- Chart tooltip ---------- */
 .chart-tooltip {

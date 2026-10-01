@@ -26,11 +26,15 @@
     priorityShown: 12,
     trendFrom: null,
     trendTo: null,
-    trendVisible: { ok: true, warn: true, total: true }
+    trendVisible: { ok: true, warn: true, total: true },
+    sankeyDirs: { turun: true, naik: true, sama: true },
+    desilBasis: 'saatIni', // saatIni | sebelumnya
+    desilSelected: []      // empty = semua desil
   };
 
   var lastTrendDays = [];
   var lastCumDays = [];
+  var lastSankeyItems = [];
   var lastHistBuckets = [];
   var tooltipEl = null;
 
@@ -248,6 +252,50 @@
     el.hidden = true;
   }
 
+  // ---------- global desil filter ----------
+  function recordDesilKey(r) {
+    return desilKey(state.desilBasis === 'sebelumnya' ? r.desilSebelumnya : r.desilSaatIni);
+  }
+
+  function activeRecords() {
+    if (!state.desilSelected.length) return state.records;
+    return state.records.filter(function (r) { return state.desilSelected.indexOf(recordDesilKey(r)) !== -1; });
+  }
+
+  function renderDesilFilter() {
+    var counts = {};
+    state.records.forEach(function (r) { var k = recordDesilKey(r); counts[k] = (counts[k] || 0) + 1; });
+    // drop selections that no longer exist after a data refresh
+    state.desilSelected = state.desilSelected.filter(function (k) { return counts[k]; });
+    var keys = Object.keys(counts).sort(function (a, b) { return desilOrder(a) - desilOrder(b); });
+
+    var none = !state.desilSelected.length;
+    var html = '<button type="button" class="chip' + (none ? ' is-active' : '') + '" data-desil="all" aria-pressed="' + none + '">Semua</button>';
+    keys.forEach(function (k) {
+      var on = state.desilSelected.indexOf(k) !== -1;
+      html += '<button type="button" class="chip' + (on ? ' is-active' : '') + '" data-desil="' + k + '" aria-pressed="' + on + '">' +
+        (k === NO_DESIL ? 'Tanpa data' : 'D' + k) + '<span class="num">' + counts[k] + '</span></button>';
+    });
+    document.getElementById('desilChips').innerHTML = html;
+
+    var countEl = document.getElementById('desilFilterCount');
+    var wrap = countEl.closest('.desil-filter');
+    if (none) {
+      countEl.textContent = 'Semua ' + state.records.length + ' pengajuan ditampilkan. Pilih satu atau beberapa desil untuk menyaring seluruh dashboard.';
+      wrap.removeAttribute('data-active');
+    } else {
+      countEl.innerHTML = 'Menampilkan <b class="num">' + activeRecords().length + '</b> dari ' + state.records.length + ' pengajuan.' +
+        '<button type="button" class="btn-ghost">Hapus filter</button>';
+      wrap.setAttribute('data-active', 'true');
+    }
+  }
+
+  function applyDesilFilter() {
+    state.page = 1;
+    state.priorityShown = 12;
+    renderAll();
+  }
+
   // ---------- KPI ----------
   function renderKPIs(records) {
     var total = records.length;
@@ -272,7 +320,7 @@
   var URGENCY_LABEL = { cek: 'Siap Dicek Ulang', kritis: 'Kritis', perhatian: 'Perhatian', baru: 'Baru', progress: 'Sedang Diperbaiki' };
 
   function getPriorityRecords() {
-    return state.records
+    return activeRecords()
       .filter(function (r) { return r._urgency; })
       .filter(function (r) { return state.urgencyFilter === 'all' || r._urgency === state.urgencyFilter; })
       .sort(function (a, b) {
@@ -362,7 +410,7 @@
     toInput.min = bounds.min; toInput.max = bounds.max; toInput.value = state.trendTo;
 
     var map = {};
-    state.records.forEach(function (r) {
+    activeRecords().forEach(function (r) {
       if (!r._verifKey) return;
       if (r._verifKey < state.trendFrom || r._verifKey > state.trendTo) return;
       if (!map[r._verifKey]) map[r._verifKey] = { ok: 0, warn: 0 };
@@ -437,7 +485,7 @@
 
     // start from everything verified before the selected range, so the line is truly cumulative
     var base = { ok: 0, warn: 0 };
-    state.records.forEach(function (r) {
+    activeRecords().forEach(function (r) {
       if (!r._verifKey || r._verifKey >= state.trendFrom) return;
       if (r.statusVerifikasi === 'SESUAI') base.ok++;
       else if (r.statusVerifikasi === 'PERLU DIPERBAIKI') base.warn++;
@@ -512,7 +560,7 @@
 
   // ---------- histogram: distribusi lama menunggu ----------
   function computeHistogramBuckets() {
-    var records = state.records.filter(function (r) { return r.tindakLanjut === 'MENUNGGU RESPON' && r._hariMenunggu != null; });
+    var records = activeRecords().filter(function (r) { return r.tindakLanjut === 'MENUNGGU RESPON' && r._hariMenunggu != null; });
     if (!records.length) return [];
     var bucketSize = 7;
     var maxDays = Math.max.apply(null, records.map(function (r) { return r._hariMenunggu; }));
@@ -574,6 +622,191 @@
     return '<div class="tt-title">' + b.label + '</div>' + b.count + ' kasus menunggu respon';
   }
 
+  // ---------- sankey: perpindahan desil ----------
+  var NO_DESIL = 'none';
+  var DIR_LABEL = { naik: 'Naik', turun: 'Turun', sama: 'Tetap' };
+
+  function desilKey(v) { return v == null ? NO_DESIL : String(v); }
+  function desilLabel(k) { return k === NO_DESIL ? 'Tanpa data' : 'Desil ' + k; }
+  function desilOrder(k) { return k === NO_DESIL ? 99 : Number(k); }
+
+  function desilDirection(r) {
+    var h = (r.hasilPemutakhiran || '').toLowerCase();
+    if (h === 'naik' || h === 'turun') return h;
+    if (h === 'sama') return 'sama';
+    if (r.desilSebelumnya != null && r.desilSaatIni != null) {
+      var a = Number(r.desilSebelumnya), b = Number(r.desilSaatIni);
+      return b > a ? 'naik' : b < a ? 'turun' : 'sama';
+    }
+    return 'sama';
+  }
+
+  function computeSankey() {
+    var linkMap = {};
+    var skipped = 0;
+    activeRecords().forEach(function (r) {
+      if (r.desilSebelumnya == null && r.desilSaatIni == null) { skipped++; return; }
+      var dir = desilDirection(r);
+      if (!state.sankeyDirs[dir]) return;
+      var from = desilKey(r.desilSebelumnya), to = desilKey(r.desilSaatIni);
+      var id = from + '>' + to;
+      if (!linkMap[id]) linkMap[id] = { from: from, to: to, dir: dir, value: 0 };
+      linkMap[id].value++;
+    });
+    var links = Object.keys(linkMap).map(function (k) { return linkMap[k]; });
+
+    function buildNodes(side) {
+      var m = {};
+      links.forEach(function (l) {
+        var k = l[side];
+        if (!m[k]) m[k] = { key: k, side: side, value: 0, naik: 0, turun: 0, sama: 0 };
+        m[k].value += l.value;
+        m[k][l.dir] += l.value;
+      });
+      return Object.keys(m).map(function (k) { return m[k]; })
+        .sort(function (a, b) { return desilOrder(a.key) - desilOrder(b.key); });
+    }
+    return { links: links, left: buildNodes('from'), right: buildNodes('to'), skipped: skipped };
+  }
+
+  function renderSankey() {
+    var svg = document.getElementById('sankeyChart');
+    var note = document.getElementById('sankeyNote');
+    var data = computeSankey();
+    var total = data.links.reduce(function (s, l) { return s + l.value; }, 0);
+
+    var turun = 0, naik = 0, sama = 0;
+    data.links.forEach(function (l) { if (l.dir === 'turun') turun += l.value; else if (l.dir === 'naik') naik += l.value; else sama += l.value; });
+    note.textContent = total
+      ? total + ' keluarga ditampilkan: ' + turun + ' turun, ' + naik + ' naik' + (state.sankeyDirs.sama ? ', ' + sama + ' tetap' : '') + '.' +
+        (data.skipped ? ' ' + data.skipped + ' keluarga tanpa data desil sama sekali tidak ditampilkan.' : '')
+      : '';
+
+    if (!total) {
+      svg.removeAttribute('viewBox');
+      svg.setAttribute('height', 60);
+      svg.innerHTML = '<text class="sankey-label" x="50%" y="30" text-anchor="middle">Tidak ada perpindahan desil.</text>';
+      lastSankeyItems = [];
+      return;
+    }
+
+    var width = Math.max(300, document.getElementById('sankeyWrap').clientWidth);
+    var labelW = width < 480 ? 92 : 118;
+    var nodeW = 10;
+    var nodeGap = 6;
+    var padTop = 26, padBottom = 6;
+    var minSlot = 15; // every node gets at least one label line of room, so small nodes never overlap
+    var maxNodes = Math.max(data.left.length, data.right.length);
+    var scale = (Math.max(240, Math.min(520, total * 2.4)) - nodeGap * (maxNodes - 1)) / total;
+    function columnHeight(nodes) {
+      return nodes.reduce(function (s, n) { return s + Math.max(n.value * scale, minSlot); }, 0) + nodeGap * (nodes.length - 1);
+    }
+    var bodyH = Math.max(columnHeight(data.left), columnHeight(data.right));
+    var height = padTop + bodyH + padBottom;
+    var xLeft = labelW, xRight = width - labelW - nodeW;
+
+    function place(nodes) {
+      // center each column vertically so the shorter one doesn't hug the top
+      var y = padTop + (bodyH - columnHeight(nodes)) / 2;
+      nodes.forEach(function (n) {
+        var h = n.value * scale;
+        var slot = Math.max(h, minSlot);
+        n.h = Math.max(h, 1.5);
+        n.y = y + (slot - h) / 2;
+        n.outY = n.y; n.inY = n.y; // running offsets for link attachment
+        y += slot + nodeGap;
+      });
+    }
+    place(data.left);
+    place(data.right);
+
+    var leftByKey = {}, rightByKey = {};
+    data.left.forEach(function (n) { leftByKey[n.key] = n; });
+    data.right.forEach(function (n) { rightByKey[n.key] = n; });
+
+    // order bands so they leave/enter each node in the same vertical order as their other end (fewer crossings)
+    var linksOut = data.links.slice().sort(function (a, b) {
+      return desilOrder(a.from) - desilOrder(b.from) || desilOrder(a.to) - desilOrder(b.to);
+    });
+    linksOut.forEach(function (l) {
+      var s = leftByKey[l.from]; l.h = l.value * scale; l.y0 = s.outY + l.h / 2; s.outY += l.h;
+    });
+    var linksIn = data.links.slice().sort(function (a, b) {
+      return desilOrder(a.to) - desilOrder(b.to) || desilOrder(a.from) - desilOrder(b.from);
+    });
+    linksIn.forEach(function (l) {
+      var t = rightByKey[l.to]; l.y1 = t.inY + l.h / 2; t.inY += l.h;
+    });
+
+    var items = [];
+    var parts = [];
+    parts.push('<text class="sankey-col-title" x="' + (xLeft + nodeW) + '" y="12" text-anchor="end">Sebelumnya</text>');
+    parts.push('<text class="sankey-col-title" x="' + xRight + '" y="12">Saat ini</text>');
+
+    // draw "tetap" bands first so the changes sit on top
+    var DIR_Z = { sama: 0, naik: 1, turun: 2 };
+    data.links.slice().sort(function (a, b) { return DIR_Z[a.dir] - DIR_Z[b.dir] || b.value - a.value; }).forEach(function (l) {
+      var x0 = xLeft + nodeW, x1 = xRight, mx = (x0 + x1) / 2;
+      var idx = items.push({ type: 'link', link: l }) - 1;
+      parts.push('<path class="sankey-link" data-idx="' + idx + '" data-dir="' + l.dir + '" data-from="' + l.from + '" data-to="' + l.to + '"' +
+        ' d="M' + x0 + ',' + l.y0.toFixed(1) + ' C' + mx + ',' + l.y0.toFixed(1) + ' ' + mx + ',' + l.y1.toFixed(1) + ' ' + x1 + ',' + l.y1.toFixed(1) + '"' +
+        ' stroke-width="' + Math.max(l.h, 1.2).toFixed(1) + '"></path>');
+    });
+
+    function drawNodes(nodes, x, anchorEnd) {
+      nodes.forEach(function (n) {
+        var idx = items.push({ type: 'node', node: n }) - 1;
+        parts.push('<rect class="sankey-node" data-idx="' + idx + '" data-side="' + n.side + '" data-key="' + n.key + '"' +
+          (n.key === NO_DESIL ? ' data-empty="true"' : '') +
+          ' x="' + x + '" y="' + n.y.toFixed(1) + '" width="' + nodeW + '" height="' + n.h.toFixed(1) + '" rx="2"></rect>');
+        var ty = n.y + n.h / 2 + 4;
+        var tx = anchorEnd ? x - 6 : x + nodeW + 6;
+        parts.push('<text class="sankey-label" x="' + tx + '" y="' + ty.toFixed(1) + '" text-anchor="' + (anchorEnd ? 'end' : 'start') + '" pointer-events="none">' +
+          desilLabel(n.key) + ' <tspan class="num">' + n.value + '</tspan></text>');
+      });
+    }
+    drawNodes(data.left, xLeft, true);
+    drawNodes(data.right, xRight, false);
+
+    svg.setAttribute('viewBox', '0 0 ' + width + ' ' + height);
+    svg.setAttribute('height', height);
+    svg.innerHTML = parts.join('');
+    lastSankeyItems = items;
+  }
+
+  function formatSankeyTooltip(item) {
+    if (item.type === 'link') {
+      var l = item.link;
+      return '<div class="tt-title">' + desilLabel(l.from) + ' → ' + desilLabel(l.to) + '</div>' +
+        l.value + ' keluarga · ' + DIR_LABEL[l.dir];
+    }
+    var n = item.node;
+    var parts = [];
+    if (n.turun) parts.push(n.turun + ' turun');
+    if (n.naik) parts.push(n.naik + ' naik');
+    if (n.sama) parts.push(n.sama + ' tetap');
+    return '<div class="tt-title">' + desilLabel(n.key) + ' · ' + (n.side === 'from' ? 'sebelumnya' : 'saat ini') + '</div>' +
+      n.value + ' keluarga<br>' + parts.join(', ');
+  }
+
+  function wireSankeyFocus() {
+    var svg = document.getElementById('sankeyChart');
+    svg.addEventListener('mouseover', function (e) {
+      var el = e.target.closest('.sankey-link, .sankey-node');
+      Array.prototype.forEach.call(svg.querySelectorAll('.sankey-link.is-hot'), function (p) { p.classList.remove('is-hot'); });
+      if (!el) { svg.classList.remove('is-focus'); return; }
+      svg.classList.add('is-focus');
+      if (el.classList.contains('sankey-link')) { el.classList.add('is-hot'); return; }
+      var attr = el.getAttribute('data-side') === 'from' ? 'data-from' : 'data-to';
+      var key = el.getAttribute('data-key');
+      Array.prototype.forEach.call(svg.querySelectorAll('.sankey-link[' + attr + '="' + key + '"]'), function (p) { p.classList.add('is-hot'); });
+    });
+    svg.addEventListener('mouseleave', function () {
+      svg.classList.remove('is-focus');
+      Array.prototype.forEach.call(svg.querySelectorAll('.sankey-link.is-hot'), function (p) { p.classList.remove('is-hot'); });
+    });
+  }
+
   // ---------- secondary panels ----------
   function renderBarBreakdown(containerId, items, totalOverride) {
     var container = document.getElementById(containerId);
@@ -590,7 +823,7 @@
   }
 
   function renderSecondary() {
-    var records = state.records;
+    var records = activeRecords();
 
     // Perubahan desil
     var naik = records.filter(function (r) { return r.hasilPemutakhiran === 'Naik'; }).length;
@@ -681,7 +914,7 @@
   // ---------- full table ----------
   function getFilteredRecords() {
     var search = state.search.trim().toLowerCase();
-    return state.records.filter(function (r) {
+    return activeRecords().filter(function (r) {
       if (state.statusFilter !== 'all' && r.statusVerifikasi !== state.statusFilter) return false;
       if (state.tindakFilter !== 'all') {
         if (state.tindakFilter === 'SELESAI') { if (r.tindakLanjut) return false; }
@@ -786,10 +1019,12 @@
   // ---------- render all ----------
   function renderAll() {
     renderSyncIndicator();
-    renderKPIs(state.records);
+    renderDesilFilter();
+    renderKPIs(activeRecords());
     renderPriority();
     renderTrend();
     renderHistogram();
+    renderSankey();
     renderSecondary();
     renderTable();
     syncSortUI();
@@ -900,6 +1135,41 @@
 
     attachChartHover(document.getElementById('trendChart'), function () { return lastTrendDays; }, formatTrendTooltip);
     attachChartHover(document.getElementById('cumChart'), function () { return lastCumDays; }, formatCumTooltip);
+    attachChartHover(document.getElementById('sankeyChart'), function () { return lastSankeyItems; }, formatSankeyTooltip);
+    wireSankeyFocus();
+    document.getElementById('sankeyLegend').addEventListener('click', function (e) {
+      var btn = e.target.closest('.legend-item');
+      if (!btn) return;
+      var dir = btn.getAttribute('data-dir');
+      state.sankeyDirs[dir] = !state.sankeyDirs[dir];
+      btn.classList.toggle('is-off', !state.sankeyDirs[dir]);
+      btn.setAttribute('aria-pressed', String(state.sankeyDirs[dir]));
+      renderSankey();
+    });
+
+    document.getElementById('desilChips').addEventListener('click', function (e) {
+      var btn = e.target.closest('.chip');
+      if (!btn) return;
+      var key = btn.getAttribute('data-desil');
+      if (key === 'all') {
+        state.desilSelected = [];
+      } else {
+        var i = state.desilSelected.indexOf(key);
+        if (i === -1) state.desilSelected.push(key); else state.desilSelected.splice(i, 1);
+      }
+      applyDesilFilter();
+    });
+    document.getElementById('desilBasis').addEventListener('change', function (e) {
+      state.desilBasis = e.target.value;
+      state.desilSelected = [];
+      applyDesilFilter();
+    });
+    document.getElementById('desilFilterCount').addEventListener('click', function (e) {
+      if (!e.target.closest('.btn-ghost')) return;
+      state.desilSelected = [];
+      applyDesilFilter();
+    });
+    window.addEventListener('resize', debounce(function () { if (state.records.length) renderSankey(); }, 150));
     attachChartHover(document.getElementById('histChart'), function () { return lastHistBuckets; }, formatHistTooltip);
   }
 
